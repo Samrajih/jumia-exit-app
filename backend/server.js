@@ -21,11 +21,16 @@ const admin = require("firebase-admin");
 
 let serviceAccount;
 
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  // ✅ Render / Production
+if (process.env.NODE_ENV === "production") {
+  // ✅ Render / production: ONLY use env var
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    console.error("FIREBASE_SERVICE_ACCOUNT is missing in production");
+    process.exit(1);
+  }
+
   serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
 } else {
-  // ✅ Local development
+  // ✅ Local development only
   serviceAccount = require("./serviceAccount.json");
 }
 
