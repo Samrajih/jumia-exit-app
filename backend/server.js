@@ -28,7 +28,22 @@ if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
 
+  console.log("NODE_ENV =", process.env.NODE_ENV);
+console.log(
+  "FIREBASE_SERVICE_ACCOUNT length =",
+  process.env.FIREBASE_SERVICE_ACCOUNT
+    ? process.env.FIREBASE_SERVICE_ACCOUNT.length
+    : "MISSING"
+);
+
+
   serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
+console.log(
+  "FIREBASE ENV CHECK:",
+  process.env.FIREBASE_SERVICE_ACCOUNT?.slice(0, 50)
+);
+
 } else {
   // ✅ Local development only
   serviceAccount = require("./serviceAccount.json");
@@ -41,6 +56,7 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+
 
 // other imports
 const generateClearancePDF = require("./pdf");
