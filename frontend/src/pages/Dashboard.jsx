@@ -239,21 +239,19 @@ export default function Dashboard() {
                   >
                     {["Completed", "Rejected"].includes(r.status) ? "View" : "Process"}
                   </button>
-                  {r.status === "Completed" && (
-                    <button
-                      onClick={() => handleGeneratePDF(r.id)}
-                      style={{
-                        padding: "6px 12px",
-                        background: "#4CAF50",
-                        color: "white",
-                        border: "none",
-                        borderRadius: "4px",
-                        cursor: "pointer"
-                      }}
-                    >
-                      PDF
-                    </button>
-                  )}
+                  <button
+                    onClick={() => handleGeneratePDF(r.id)}
+                    style={{
+                      padding: "6px 12px",
+                      background: "#4CAF50",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer"
+                    }}
+                  >
+                    PDF
+                  </button>
                 </td>
               </tr>
             ))}

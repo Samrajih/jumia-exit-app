@@ -7,6 +7,7 @@ import LineManager from "./pages/LineManager";
 import HR from "./pages/HR";
 import Finance from "./pages/Finance";
 import IT from "./pages/IT";
+import View from "./pages/View";
 
 // Protected Route component
 function ProtectedRoute({ children }) {
@@ -58,6 +59,12 @@ function App() {
         <Route path="/it/:id" element={
           <ProtectedRoute>
             <IT />
+          </ProtectedRoute>
+        } />
+        
+        <Route path="/view/:id" element={
+          <ProtectedRoute>
+            <View />
           </ProtectedRoute>
         } />
         
