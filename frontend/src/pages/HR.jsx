@@ -37,6 +37,10 @@ export default function HRClearance() {
       .finally(() => setLoading(false));
   }, [id]);
 
+  // Determine if this is HR Initiation or HR Final
+  const isHRFinal = record?.status === "HR-Final";
+  const currentStage = isHRFinal ? "HR-Final" : "HR-Pending";
+
   const handleCheckbox = (field) => {
     setClearance(prev => ({ ...prev, [field]: !prev[field] }));
   };
@@ -49,9 +53,11 @@ export default function HRClearance() {
     setSaving(true);
     try {
       const payload = {
-        currentStage: "HR-Final",
+        currentStage: currentStage,
         action: action,
-        comment: action === "na" ? "HR Final Clearance marked as N/A" : "HR Final Clearance completed",
+        comment: action === "na" 
+          ? `${isHRFinal ? "HR Final" : "HR Initiation"} marked as N/A` 
+          : `${isHRFinal ? "HR Final" : "HR Initiation"} completed`,
         clearance: isNA ? { isNA: true } : clearance,
       };
 
@@ -63,7 +69,7 @@ export default function HRClearance() {
 
       const data = await res.json();
       if (data.success) {
-        alert(`HR Final Clearance ${action === "na" ? "marked as N/A" : "submitted"} successfully!`);
+        alert(`${isHRFinal ? "HR Final" : "HR Initiation"} ${action === "na" ? "marked as N/A" : "submitted"} successfully!`);
         navigate("/");
       } else {
         alert("Error: " + data.message);
@@ -80,7 +86,7 @@ export default function HRClearance() {
 
   return (
     <div style={{ padding: "20px" }}>
-      <h2>HR Final Clearance</h2>
+      <h2>{isHRFinal ? "HR Final Clearance" : "HR Initiation"}</h2>
       
       <div style={{ background: "#f5f5f5", padding: "15px", borderRadius: "8px", marginBottom: "20px" }}>
         <h3>Employee Details</h3>
@@ -88,6 +94,12 @@ export default function HRClearance() {
         <p><strong>Department:</strong> {record.department}</p>
         <p><strong>Employee ID:</strong> {record.employeeId}</p>
         <p><strong>Exit Date:</strong> {record.exitDate}</p>
+        {!isHRFinal && (
+          <>
+            <p><strong>Position:</strong> {record.position}</p>
+            <p><strong>Reason for Exit:</strong> {record.reason}</p>
+          </>
+        )}
       </div>
 
       {/* N/A Option */}
@@ -102,7 +114,7 @@ export default function HRClearance() {
           <strong>Mark as N/A (Not Applicable)</strong>
         </label>
         <p style={{ color: "#666", marginTop: "5px" }}>
-          Check this if HR final clearance is not required
+          Check this if {isHRFinal ? "HR final" : "HR initiation"} clearance is not required
         </p>
       </div>
 
