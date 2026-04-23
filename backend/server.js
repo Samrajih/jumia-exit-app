@@ -83,15 +83,18 @@ async function sendNotification(record, action, currentStage, nextStage, comment
 
   switch (action) {
     case "submit":
-      subject = `Exit Request Submitted - ${employeeName}`;
+      subject = `New Exit Request - ${employeeName}`;
       body = `A new exit request has been submitted for ${employeeName} (${record.employeeId}).
       
 Department: ${record.department}
 Position: ${record.position}
 Last Working Day: ${record.lastWorkingDay}
 
-Please proceed to the Line Manager for approval.`;
-      to = record.lineManagerEmail ? [record.lineManagerEmail] : EMAIL_CONFIG.lineManagerEmails;
+Please proceed with HR Initiation clearance.`;
+      // Notify HR to initiate the clearance process
+      to = EMAIL_CONFIG.hrEmails;
+      // Also notify the exiting employee
+      cc = employeeEmail ? [employeeEmail] : [];
       break;
 
     case "approve":
@@ -214,8 +217,8 @@ app.post("/submit-exit", async (req, res) => {
     const docRef = await db.collection("exits").add({
       ...data,
 
-      // ✅ HARD RULE: ALL cases MUST start here
-      status: "LineManager-Pending",
+      // ✅ Workflow: HR initiates → LineManager → Finance → IT → HR-Final → Completed
+      status: "HR-Pending",
 
       createdAt: new Date(),
 
@@ -226,9 +229,9 @@ app.post("/submit-exit", async (req, res) => {
       HRFinalClearance: null,
     });
 
-    // Send email notification to Line Manager
+    // Send email notification to HR to initiate
     const record = { id: docRef.id, ...data };
-    await sendNotification(record, "submit", "HR", "LineManager", null);
+    await sendNotification(record, "submit", null, "HR", null);
 
     res.json({
       success: true,
@@ -257,12 +260,12 @@ app.get("/get-exits", async (req, res) => {
 });
 
 // ==================================
-// APPROVE WITH OPTIONAL COMMENT
+// APPROVE WITH OPTIONAL COMMENT AND CLEARANCE DATA
 // ==================================
 app.post("/approve/:id", async (req, res) => {
   try {
     const id = req.params.id;
-    const { currentStage, comment, action } = req.body;
+    const { currentStage, comment, action, clearance } = req.body;
 
     if (!currentStage) {
       return res.status(400).json({
@@ -328,18 +331,31 @@ app.post("/approve/:id", async (req, res) => {
     const docSnap = await db.collection("exits").doc(id).get();
     const record = { id, ...docSnap.data() };
 
-    await db.collection("exits").doc(id).set(
-      {
-        status: nextStatus,
-        approvalComments: admin.firestore.FieldValue.arrayUnion({
-          by: stageName,
-          comment: comment || (action === "na" ? "N/A - Skipped" : null),
-          at: new Date().toISOString(),
-          action: action || "approve",
-        }),
-      },
-      { merge: true }
-    );
+    // Build update object
+    const updateData = {
+      status: nextStatus,
+      approvalComments: admin.firestore.FieldValue.arrayUnion({
+        by: stageName,
+        comment: comment || (action === "na" ? "N/A - Skipped" : null),
+        at: new Date().toISOString(),
+        action: action || "approve",
+      }),
+    };
+
+    // Save clearance data based on stage
+    if (clearance) {
+      if (stageName === "HR" || stageName === "HR-Final") {
+        updateData.HRFinalClearance = clearance;
+      } else if (stageName === "LineManager") {
+        updateData.LineManagerClearance = clearance;
+      } else if (stageName === "Finance") {
+        updateData.FinanceClearance = clearance;
+      } else if (stageName === "IT") {
+        updateData.ITAssets = clearance;
+      }
+    }
+
+    await db.collection("exits").doc(id).set(updateData, { merge: true });
 
     // Send email notification
     await sendNotification(record, notificationAction, stageName, nextStageName, comment);
@@ -749,6 +765,12 @@ app.get("/reports/exits/export", async (req, res) => {
 // CLEARANCE PDF ROUTE
 // ==============================
 app.get("/clearance/:id", generateClearancePDF);
+
+// Alias route for generate-pdf
+app.get("/generate-pdf/:id", (req, res) => {
+  // Redirect to the clearance route
+  res.redirect(`/clearance/${req.params.id}`);
+});
 
 // ==============================
 // START SERVER

@@ -19,7 +19,7 @@ function approvalState(stage, currentStatus) {
     "LineManager-Pending",
     "Finance-Pending",
     "IT-Pending",
-    "HR-Final-Pending",
+    "HR-Final",
     "Completed",
     "Rejected",
   ];
@@ -65,7 +65,8 @@ async function generateClearancePDF(req, res) {
     /* QR before streaming */
     let qrBuffer = null;
     try {
-      const verifyURL = `https://unplausible-nontubercularly-estela.ngrok-free.dev/clearance/${id}`;
+      // Use the actual deployed backend URL for QR code verification
+      const verifyURL = `https://jumia-exit-backend.onrender.com/clearance/${id}`;
       const qrData = await QRCode.toDataURL(verifyURL);
       qrBuffer = Buffer.from(qrData.split(",")[1], "base64");
     } catch {}
@@ -117,10 +118,11 @@ async function generateClearancePDF(req, res) {
     y += 18;
 
     doc.fontSize(11);
+    doc.text(`HR Initiation: ${approvalState("HR-Pending", data.status)}`, 40, y); y += 14;
     doc.text(`Line Manager: ${approvalState("LineManager-Pending", data.status)}`, 40, y); y += 14;
     doc.text(`Finance: ${approvalState("Finance-Pending", data.status)}`, 40, y); y += 14;
     doc.text(`IT: ${approvalState("IT-Pending", data.status)}`, 40, y); y += 14;
-    doc.text(`HR Final: ${approvalState("HR-Final-Pending", data.status)}`, 40, y);
+    doc.text(`HR Final: ${approvalState("HR-Final", data.status)}`, 40, y);
 
     y += 30;
 
