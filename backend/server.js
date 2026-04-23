@@ -319,12 +319,16 @@ app.post("/approve/:id", async (req, res) => {
       nextStageName = WORKFLOW[index + 2] || "Completed";
       nextStatus = nextStageName === "Completed" 
         ? "Completed" 
-        : `${nextStageName}-Pending`;
+        : nextStageName === "HR-Final"
+          ? "HR-Final"
+          : `${nextStageName}-Pending`;
     } else {
       nextStageName = WORKFLOW[index + 1];
       nextStatus = nextStageName === "Completed"
         ? "Completed"
-        : `${nextStageName}-Pending`;
+        : nextStageName === "HR-Final"
+          ? "HR-Final"
+          : `${nextStageName}-Pending`;
     }
 
     // Get the current record for email notification
