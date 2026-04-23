@@ -28,21 +28,8 @@ if (process.env.NODE_ENV === "production") {
     process.exit(1);
   }
 
-  console.log("NODE_ENV =", process.env.NODE_ENV);
-console.log(
-  "FIREBASE_SERVICE_ACCOUNT length =",
-  process.env.FIREBASE_SERVICE_ACCOUNT
-    ? process.env.FIREBASE_SERVICE_ACCOUNT.length
-    : "MISSING"
-);
-
 
   serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-
-console.log(
-  "FIREBASE ENV CHECK:",
-  process.env.FIREBASE_SERVICE_ACCOUNT?.slice(0, 50)
-);
 
 } else {
   // ✅ Local development only
@@ -58,9 +45,150 @@ if (!admin.apps.length) {
 const db = admin.firestore();
 
 
-// other imports
-const generateClearancePDF = require("./pdf");
+// ==============================
+// EMAIL NOTIFICATION HELPER
+// ==============================
 const sendEmail = require("./graphEmail");
+
+// Email configuration
+const EMAIL_CONFIG = {
+  senderEmail: process.env.SENDER_EMAIL || "hr@jumia.com",
+  // Notification emails (configure these in .env)
+  hrEmails: process.env.HR_EMAILS ? process.env.HR_EMAILS.split(",") : ["hr@jumia.com"],
+  lineManagerEmails: process.env.LINE_MANAGER_EMAILS ? process.env.LINE_MANAGER_EMAILS.split(",") : [],
+  financeEmails: process.env.FINANCE_EMAILS ? process.env.FINANCE_EMAILS.split(",") : ["finance@jumia.com"],
+  itEmails: process.env.IT_EMAILS ? process.env.IT_EMAILS.split(",") : ["it@jumia.com"],
+};
+
+// Send notification email
+async function sendNotification(record, action, currentStage, nextStage, comment) {
+  const employeeEmail = record.email;
+  const employeeName = record.name;
+  
+  const stageLabels = {
+    "HR": "HR Initiation",
+    "LineManager": "Line Manager",
+    "Finance": "Finance",
+    "IT": "IT",
+    "HR-Final": "HR Final Clearance"
+  };
+
+  let subject = "";
+  let body = "";
+  let to = [];
+  let cc = [];
+
+  // Always CC the employee
+  if (employeeEmail) cc.push(employeeEmail);
+
+  switch (action) {
+    case "submit":
+      subject = `Exit Request Submitted - ${employeeName}`;
+      body = `A new exit request has been submitted for ${employeeName} (${record.employeeId}).
+      
+Department: ${record.department}
+Position: ${record.position}
+Last Working Day: ${record.lastWorkingDay}
+
+Please proceed to the Line Manager for approval.`;
+      to = record.lineManagerEmail ? [record.lineManagerEmail] : EMAIL_CONFIG.lineManagerEmails;
+      break;
+
+    case "approve":
+      subject = `Exit Approved - ${employeeName} - Action Required`;
+      body = `Exit request for ${employeeName} has been approved by ${stageLabels[currentStage]}.
+      
+${comment ? `Comment: ${comment}` : ""}
+
+Next Step: ${stageLabels[nextStage]} clearance is required.
+
+Employee: ${employeeName}
+Department: ${record.department}
+Position: ${record.position}`;
+      
+      // Determine next stage recipients
+      if (nextStage === "Finance") {
+        to = EMAIL_CONFIG.financeEmails;
+      } else if (nextStage === "IT") {
+        to = EMAIL_CONFIG.itEmails;
+      } else if (nextStage === "HR-Final") {
+        to = EMAIL_CONFIG.hrEmails;
+      } else if (nextStage === "Completed") {
+        // Final completion - notify everyone
+        to = EMAIL_CONFIG.hrEmails;
+        cc = [employeeEmail, ...EMAIL_CONFIG.lineManagerEmails, ...EMAIL_CONFIG.financeEmails, ...EMAIL_CONFIG.itEmails];
+        subject = `Exit Clearance COMPLETED - ${employeeName}`;
+        body = `Exit clearance for ${employeeName} has been COMPLETED.
+
+All stages cleared:
+- HR Initiation
+- Line Manager Approval
+- Finance Clearance
+- IT Clearance
+- HR Final Clearance
+
+Employee: ${employeeName}
+Employee ID: ${record.employeeId}
+Department: ${record.department}
+Position: ${record.position}
+Last Working Day: ${record.lastWorkingDay}
+
+The clearance certificate is available for download.`;
+      }
+      break;
+
+    case "na":
+      subject = `Exit Clearance - N/A - ${employeeName}`;
+      body = `Exit request for ${employeeName} has been marked as N/A (Not Applicable) by ${stageLabels[currentStage]}.
+      
+This stage does not require clearance.
+
+Employee: ${employeeName}
+Department: ${record.department}`;
+      
+      // Push to next stage even with N/A
+      if (nextStage === "Finance") {
+        to = EMAIL_CONFIG.financeEmails;
+      } else if (nextStage === "IT") {
+        to = EMAIL_CONFIG.itEmails;
+      } else if (nextStage === "HR-Final") {
+        to = EMAIL_CONFIG.hrEmails;
+      } else if (nextStage === "Completed") {
+        to = EMAIL_CONFIG.hrEmails;
+        cc = [employeeEmail, ...EMAIL_CONFIG.lineManagerEmails, ...EMAIL_CONFIG.financeEmails, ...EMAIL_CONFIG.itEmails];
+      }
+      break;
+
+    case "reject":
+      subject = `Exit Request REJECTED - ${employeeName}`;
+      body = `Exit request for ${employeeName} has been REJECTED.
+
+Reason: ${comment || "No reason provided"}
+
+Employee: ${employeeName}
+Department: ${record.department}`;
+      to = [employeeEmail];
+      cc = EMAIL_CONFIG.hrEmails;
+      break;
+  }
+
+  // Send email if configured (will fail gracefully if not configured)
+  if (to.length > 0 && process.env.SENDER_EMAIL && process.env.GRAPH_ACCESS_TOKEN) {
+    try {
+      await sendEmail({
+        to: to.join(","),
+        subject,
+        body,
+        accessToken: process.env.GRAPH_ACCESS_TOKEN
+      });
+      console.log("📧 Notification email sent:", subject);
+    } catch (err) {
+      console.log("📧 Email notification skipped (not configured):", err.message);
+    }
+  } else {
+    console.log("📧 Email notification skipped (no credentials):", subject);
+  }
+}
 
 // workflow
 const WORKFLOW = [
@@ -87,7 +215,7 @@ app.post("/submit-exit", async (req, res) => {
       ...data,
 
       // ✅ HARD RULE: ALL cases MUST start here
-      status: "HR-Pending",
+      status: "LineManager-Pending",
 
       createdAt: new Date(),
 
@@ -97,6 +225,10 @@ app.post("/submit-exit", async (req, res) => {
       LineManagerClearance: null,
       HRFinalClearance: null,
     });
+
+    // Send email notification to Line Manager
+    const record = { id: docRef.id, ...data };
+    await sendNotification(record, "submit", "HR", "LineManager", null);
 
     res.json({
       success: true,
@@ -130,7 +262,7 @@ app.get("/get-exits", async (req, res) => {
 app.post("/approve/:id", async (req, res) => {
   try {
     const id = req.params.id;
-    const { currentStage, comment } = req.body;
+    const { currentStage, comment, action } = req.body;
 
     if (!currentStage) {
       return res.status(400).json({
@@ -143,9 +275,9 @@ app.post("/approve/:id", async (req, res) => {
     let stageName;
 
     if (currentStage.startsWith("HR-Final")) {
-    stageName = "HR-Final";
+      stageName = "HR-Final";
     } else {
-    stageName = currentStage.split("-")[0];
+      stageName = currentStage.split("-")[0];
     }
 
     const WORKFLOW = [
@@ -172,27 +304,51 @@ app.post("/approve/:id", async (req, res) => {
       });
     }
 
-    const nextStageName = WORKFLOW[index + 1];
-    const nextStatus =
-      nextStageName === "Completed"
+    // Determine notification action
+    const notificationAction = action === "na" ? "na" : "approve";
+
+    // If N/A, skip to next stage (skip one more level)
+    let nextStageName;
+    let nextStatus;
+
+    if (action === "na") {
+      // Skip this stage - go to next next stage
+      nextStageName = WORKFLOW[index + 2] || "Completed";
+      nextStatus = nextStageName === "Completed" 
+        ? "Completed" 
+        : `${nextStageName}-Pending`;
+    } else {
+      nextStageName = WORKFLOW[index + 1];
+      nextStatus = nextStageName === "Completed"
         ? "Completed"
         : `${nextStageName}-Pending`;
+    }
+
+    // Get the current record for email notification
+    const docSnap = await db.collection("exits").doc(id).get();
+    const record = { id, ...docSnap.data() };
 
     await db.collection("exits").doc(id).set(
       {
         status: nextStatus,
         approvalComments: admin.firestore.FieldValue.arrayUnion({
           by: stageName,
-          comment: comment || null,
+          comment: comment || (action === "na" ? "N/A - Skipped" : null),
           at: new Date().toISOString(),
+          action: action || "approve",
         }),
       },
       { merge: true }
     );
 
+    // Send email notification
+    await sendNotification(record, notificationAction, stageName, nextStageName, comment);
+
     res.json({
       success: true,
-      message: `Stage moved to ${nextStatus}`,
+      message: action === "na" 
+        ? `Stage ${stageName} marked as N/A, skipped to ${nextStatus}` 
+        : `Stage moved to ${nextStatus}`,
       nextStatus,
     });
 
@@ -350,6 +506,10 @@ app.post("/reject/:id", async (req, res) => {
       });
     }
 
+    // Get the current record for email notification
+    const docSnap = await db.collection("exits").doc(id).get();
+    const record = { id, ...docSnap.data() };
+
     await db.collection("exits").doc(id).set(
       {
         status: "Rejected",
@@ -361,6 +521,9 @@ app.post("/reject/:id", async (req, res) => {
       },
       { merge: true }
     );
+
+    // Send rejection email notification
+    await sendNotification(record, "reject", rejectedBy || "HR", null, reason);
 
     res.json({
       success: true,
