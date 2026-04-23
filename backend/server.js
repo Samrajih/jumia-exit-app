@@ -772,8 +772,12 @@ app.get("/clearance/:id", generateClearancePDF);
 
 // Alias route for generate-pdf
 app.get("/generate-pdf/:id", (req, res) => {
-  // Redirect to the clearance route
-  res.redirect(`/clearance/${req.params.id}`);
+  // Return JSON with the PDF URL - use the production backend URL
+  const pdfUrl = `https://jumia-exit-backend.onrender.com/clearance/${req.params.id}`;
+  res.json({
+    success: true,
+    pdfUrl: pdfUrl
+  });
 });
 
 // ==============================
