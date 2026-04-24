@@ -40,7 +40,7 @@ export default function Dashboard() {
     
     // Role-based filtering for non-admin users
     const roleStageMap = {
-      "hr": ["HR-Pending", "HR-Final"],
+      "hr": ["HR-Pending", "HR-Final-Pending", "HR-Final"],
       "lineManager": ["LineManager-Pending"],
       "finance": ["Finance-Pending"],
       "it": ["IT-Pending"],
@@ -73,6 +73,8 @@ export default function Dashboard() {
     } else if (status === "IT-Pending") {
       navigate(`/it/${id}`);
     } else if (status === "HR-Final") {
+      navigate(`/hr/${id}`);
+    } else if (status === "HR-Final-Pending") {
       navigate(`/hr/${id}`);
     } else {
       // View only for completed/rejected

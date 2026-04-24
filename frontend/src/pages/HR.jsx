@@ -38,7 +38,7 @@ export default function HRClearance() {
   }, [id]);
 
   // Determine if this is HR Initiation or HR Final
-  const isHRFinal = record?.status === "HR-Final";
+  const isHRFinal = record?.status === "HR-Final" || record?.status === "HR-Final-Pending";
   const currentStage = isHRFinal ? "HR-Final" : "HR-Pending";
 
   const handleCheckbox = (field) => {
