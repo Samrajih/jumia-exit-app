@@ -57,7 +57,7 @@ export default function ITClearance() {
         currentStage: "IT-Pending",
         action: action,
         comment: action === "na" ? "IT Clearance marked as N/A" : "IT Clearance completed",
-        assets: isNA ? { isNA: true } : assets,
+        clearance: isNA ? { isNA: true } : assets,
       };
 
       const res = await fetch(`${API_URL}/approve/${id}`, {
