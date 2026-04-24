@@ -19,6 +19,7 @@ function approvalState(stage, currentStatus) {
     "LineManager-Pending",
     "Finance-Pending",
     "IT-Pending",
+    "HR-Final-Pending",
     "HR-Final",
     "Completed",
     "Rejected",
