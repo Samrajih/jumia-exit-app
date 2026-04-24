@@ -49,6 +49,7 @@ const db = admin.firestore();
 // EMAIL NOTIFICATION HELPER
 // ==============================
 const sendEmail = require("./graphEmail");
+const generateClearancePDF = require("./pdf");
 
 // Email configuration
 const EMAIL_CONFIG = {
