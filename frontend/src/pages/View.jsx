@@ -68,6 +68,7 @@ export default function View() {
         <h2 style={{ margin: "0 0 10px 0" }}>
           Exit Clearance {record.status}
         </h2>
+        <p><strong>Exit ID:</strong> {record.exitId || "N/A"}</p>
         <p><strong>Employee:</strong> {record.name}</p>
         <p><strong>Employee ID:</strong> {record.employeeId}</p>
         <p><strong>Department:</strong> {record.department}</p>

@@ -100,7 +100,7 @@ async function generateClearancePDF(req, res) {
     doc.fontSize(11);
 
     /* Details */
-    doc.text(`Exit ID: ${id}`, 40, y); y += 14;
+    doc.text(`Exit ID: ${safe(data.exitId, id.substring(0, 8))}`, 40, y); y += 14;
     doc.text(`Name: ${safe(data.name)}`, 40, y); y += 14;
     doc.text(`Employee ID: ${safe(data.employeeId)}`, 40, y); y += 14;
     doc.text(`Department: ${safe(data.department)}`, 40, y); y += 14;

@@ -200,6 +200,7 @@ export default function Dashboard() {
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
             <tr style={{ background: "#f5f5f5" }}>
+              <th style={{ padding: "12px", textAlign: "left" }}>Exit ID</th>
               <th style={{ padding: "12px", textAlign: "left" }}>Name</th>
               <th style={{ padding: "12px", textAlign: "left" }}>Employee ID</th>
               <th style={{ padding: "12px", textAlign: "left" }}>Department</th>
@@ -211,6 +212,7 @@ export default function Dashboard() {
           <tbody>
             {filteredRecords.map(r => (
               <tr key={r.id} style={{ borderBottom: "1px solid #eee" }}>
+                <td style={{ padding: "12px" }}>{r.exitId || r.id.substring(0, 8)}</td>
                 <td style={{ padding: "12px" }}>{r.name}</td>
                 <td style={{ padding: "12px" }}>{r.employeeId}</td>
                 <td style={{ padding: "12px" }}>{r.department}</td>

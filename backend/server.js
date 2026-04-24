@@ -215,8 +215,20 @@ app.post("/submit-exit", async (req, res) => {
   try {
     const data = req.body;
 
+    // Generate formatted exit ID: JUM/DEPT/DATE/NUMBER
+    const deptCode = (data.department || "XX").substring(0, 2).toUpperCase();
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, ""); // YYYYMMDD
+    
+    // Get count of existing records to generate sequential number
+    const snapshot = await db.collection("exits").count().get();
+    const count = (snapshot.data().count || 0) + 1;
+    const seqNum = String(count).padStart(3, "0"); // 001, 002, etc.
+    
+    const exitId = `JUM/${deptCode}/${dateStr}/${seqNum}`;
+
     const docRef = await db.collection("exits").add({
       ...data,
+      exitId, // Add the formatted exit ID
 
       // ✅ Workflow: HR initiates → LineManager → Finance → IT → HR-Final → Completed
       status: "HR-Pending",
@@ -231,13 +243,14 @@ app.post("/submit-exit", async (req, res) => {
     });
 
     // Send email notification to HR to initiate
-    const record = { id: docRef.id, ...data };
+    const record = { id: docRef.id, exitId, ...data };
     await sendNotification(record, "submit", null, "HR", null);
 
     res.json({
       success: true,
       message: "Exit submitted successfully",
       id: docRef.id,
+      exitId: exitId,
     });
   } catch (err) {
     console.error("SUBMIT EXIT ERROR:", err);
